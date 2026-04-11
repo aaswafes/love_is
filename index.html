@@ -467,38 +467,82 @@ const deckEl=document.getElementById('deck'),cntEl=document.getElementById('cnt'
 for(let i=0;i<total;i++){const d=document.createElement('div');d.className='pd'+(i===0?' on':'');d.onclick=()=>jmp(i);pdEl.appendChild(d)}
 function sd(){pdEl.querySelectorAll('.pd').forEach((d,i)=>d.classList.toggle('on',i===cur))}
 const POS=[{z:1,rot:-4.5,tx:0,ty:13,sc:.89,op:.3},{z:2,rot:2.5,tx:0,ty:6,sc:.955,op:.58},{z:10,rot:0,tx:0,ty:0,sc:1,op:1}];
-let els=[],rvT=[];
-function mkC(idx,p){
-  const d=CD[idx],el=document.createElement('div');el.className='card';
-  el.style.cssText=`z-index:${p.z};opacity:${p.op};transform:rotate(${p.rot}deg) translate(${p.tx}px,${p.ty}px) scale(${p.sc});transition:none`;
-  el.innerHTML=`<div class="cr"></div><img src="data:image/jpeg;base64,${d.b64}" alt="" loading="lazy" draggable="false"><div class="badge">${d.emoji}</div><div class="cap"><div class="cnum">${String(idx+1).padStart(2,'0')}/${total}</div><div class="ctxt">${d.cap}</div></div>`;
-  return el;
+const DUR=320,SPR='cubic-bezier(0.22,1.3,0.36,1)',EASE='cubic-bezier(0.25,1,0.5,1)',FAST='cubic-bezier(0.4,0,1,1)';
+// Pre-build ALL cards once, hide off-screen
+let cardEls=[];
+function applyPos(el,p,animate){
+  if(!animate)el.style.transition='none';
+  else el.style.transition=`transform ${DUR}ms ${EASE}, opacity ${DUR}ms ease`;
+  el.style.transform=`rotate(${p.rot}deg) translate(${p.tx}px,${p.ty}px) scale(${p.sc})`;
+  el.style.opacity=p.op;
+  el.style.zIndex=p.z;
 }
-function bld(){
-  rvT.forEach(clearTimeout);rvT=[];deckEl.innerHTML='';els=[];
-  [2,1,0].forEach(o=>{const idx=(cur+o)%total,pos=POS[2-o],el=mkC(idx,pos);deckEl.appendChild(el);els[2-o]=el});
+function initDeck(){
+  deckEl.innerHTML='';cardEls=[];
+  for(let i=0;i<total;i++){
+    const d=CD[i],el=document.createElement('div');el.className='card';
+    el.innerHTML=`<div class="cr"></div><img src="data:image/jpeg;base64,${d.b64}" alt="" loading="lazy" draggable="false"><div class="badge">${d.emoji}</div><div class="cap"><div class="cnum">${String(i+1).padStart(2,'0')}/${total}</div><div class="ctxt">${d.cap}</div></div>`;
+    // hide all cards initially below deck
+    el.style.cssText='position:absolute;inset:0;border-radius:20px;overflow:hidden;cursor:pointer;user-select:none;will-change:transform,opacity;transform-origin:center bottom;background:#fff;box-shadow:0 12px 50px rgba(224,25,90,.22),0 3px 12px rgba(0,0,0,.08);opacity:0;transform:translateY(60px) scale(.9);transition:none;z-index:0';
+    deckEl.appendChild(el);cardEls.push(el);
+  }
+}
+let rvT=[];
+function showDeck(){
+  rvT.forEach(clearTimeout);rvT=[];
+  // position top 3 cards
+  const idxs=[(cur+2)%total,(cur+1)%total,cur];
+  cardEls.forEach((el,i)=>{
+    const slot=idxs.indexOf(i);
+    if(slot===-1){el.style.opacity='0';el.style.zIndex='0';el.style.transform='translateY(60px) scale(.9)';return;}
+    applyPos(el,POS[slot],false);
+  });
   cntEl.textContent=`${cur+1}/${total}`;sd();
-  const top=els[2],rv=top.querySelector('.cr');
-  rvT.push(setTimeout(()=>{top.classList.add('rv');rvT.push(setTimeout(()=>rv.classList.add('g'),950))},100));
+  const top=cardEls[cur],rv=top.querySelector('.cr');
+  rv.classList.remove('g');top.classList.remove('rv');
+  rvT.push(setTimeout(()=>{top.classList.add('rv');rvT.push(setTimeout(()=>rv.classList.add('g'),900))},80));
 }
-bld();
-const SPR='cubic-bezier(0.22,1.4,0.36,1)',EASE='cubic-bezier(0.25,1,0.5,1)',FAST='cubic-bezier(0.32,0,0.16,1)',DUR=640;
-function ss(el,{rot=0,tx=0,ty=0,sc=1,op=1,dur=DUR,ease=EASE,delay=0,z}){
-  el.style.transition=`transform ${dur}ms ${ease} ${delay}ms, opacity ${Math.round(dur*.7)}ms ease ${delay}ms`;
+initDeck();showDeck();
+
+function ss(el,{rot=0,tx=0,ty=0,sc=1,op=1,dur=DUR,ease=EASE,z}){
+  el.style.transition=`transform ${dur}ms ${ease}, opacity ${Math.round(dur*.8)}ms ease`;
   el.style.transform=`rotate(${rot}deg) translate(${tx}px,${ty}px) scale(${sc})`;
-  el.style.opacity=op;if(z!==undefined)el.style.zIndex=z;
+  el.style.opacity=op;
+  if(z!==undefined)el.style.zIndex=z;
 }
 function go(dir){
   if(busy)return;busy=true;
-  // top card: arc up slightly then fly out sideways
-  ss(els[2],{rot:dir*-28,tx:dir*-260,ty:-30,sc:.72,op:0,dur:DUR,ease:FAST,z:20});
-  // second card rises and tilts gently into top position
-  ss(els[1],{...POS[2],dur:DUR,ease:SPR,delay:80,z:10});
-  // third card slides up into second position
-  ss(els[0],{...POS[1],dur:DUR,ease:EASE,delay:150,z:2});
-  setTimeout(()=>{cur=((cur+dir)%total+total)%total;bld();busy=false},DUR+60);
+  const nextCur=((cur+dir)%total+total)%total;
+  const incoming=(cur+dir*-2+total*2)%total; // card that comes into back slot
+  const topEl=cardEls[cur];
+  const midEl=cardEls[(cur+1)%total];  // was slot1, goes to slot2
+  const backEl=cardEls[(cur+2)%total]; // was slot0, goes to slot1 — for next direction
+  // for dir=1 (next): cur flies out right, (cur+1) moves to top, (cur+2) moves to mid
+  // top flies out
+  ss(topEl,{rot:dir*-22,tx:dir*-280,ty:-10,sc:.8,op:0,dur:DUR,ease:FAST,z:20});
+  // mid slides up to top
+  ss(cardEls[(cur-dir+total)%total]||midEl,{...POS[2],dur:DUR,ease:SPR,z:10});
+  // back slides up to mid
+  const b2=cardEls[((cur-dir*2)+total*2)%total];
+  ss(b2,{...POS[1],dur:DUR,ease:EASE,z:2});
+  // bring in the new back card immediately (no transition, off-screen)
+  const newBack=cardEls[((nextCur+2)%total)];
+  newBack.style.transition='none';
+  newBack.style.transform=`rotate(${POS[0].rot}deg) translate(${POS[0].tx}px,${POS[0].ty}px) scale(${POS[0].sc})`;
+  newBack.style.opacity=String(POS[0].op);
+  newBack.style.zIndex='1';
+  setTimeout(()=>{
+    cur=nextCur;
+    showDeck();
+    busy=false;
+  },DUR+40);
 }
-function jmp(i){if(busy||i===cur)return;busy=true;const d=i>cur?1:-1;ss(els[2],{rot:d*-18,tx:d*-170,ty:-16,sc:.82,op:0,dur:460,ease:FAST,z:20});setTimeout(()=>{cur=i;bld();busy=false},500)}
+function jmp(i){
+  if(busy||i===cur)return;busy=true;
+  const d=i>cur?1:-1;
+  ss(cardEls[cur],{rot:d*-22,tx:d*-280,ty:-10,sc:.8,op:0,dur:DUR,ease:FAST,z:20});
+  setTimeout(()=>{cur=i;showDeck();busy=false},DUR+30);
+}
 document.getElementById('nb').onclick=()=>go(1);document.getElementById('pb').onclick=()=>go(-1);
 document.addEventListener('keydown',e=>{if(e.key==='ArrowRight')go(1);if(e.key==='ArrowLeft')go(-1)});
 let sx=null,sy=null;
