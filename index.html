@@ -510,38 +510,46 @@ function ss(el,{rot=0,tx=0,ty=0,sc=1,op=1,dur=DUR,ease=EASE,z}){
   el.style.opacity=op;
   if(z!==undefined)el.style.zIndex=z;
 }
+// current stack: top=cardEls[cur], mid=cardEls[(cur+1)%total], back=cardEls[(cur+2)%total]
 function go(dir){
   if(busy)return;busy=true;
+  const topI=cur;
+  const midI=(cur+1)%total;
+  const backI=(cur+2)%total;
   const nextCur=((cur+dir)%total+total)%total;
-  const incoming=(cur+dir*-2+total*2)%total; // card that comes into back slot
-  const topEl=cardEls[cur];
-  const midEl=cardEls[(cur+1)%total];  // was slot1, goes to slot2
-  const backEl=cardEls[(cur+2)%total]; // was slot0, goes to slot1 — for next direction
-  // for dir=1 (next): cur flies out right, (cur+1) moves to top, (cur+2) moves to mid
-  // top flies out
-  ss(topEl,{rot:dir*-22,tx:dir*-280,ty:-10,sc:.8,op:0,dur:DUR,ease:FAST,z:20});
-  // mid slides up to top
-  ss(cardEls[(cur-dir+total)%total]||midEl,{...POS[2],dur:DUR,ease:SPR,z:10});
-  // back slides up to mid
-  const b2=cardEls[((cur-dir*2)+total*2)%total];
-  ss(b2,{...POS[1],dur:DUR,ease:EASE,z:2});
-  // bring in the new back card immediately (no transition, off-screen)
-  const newBack=cardEls[((nextCur+2)%total)];
-  newBack.style.transition='none';
-  newBack.style.transform=`rotate(${POS[0].rot}deg) translate(${POS[0].tx}px,${POS[0].ty}px) scale(${POS[0].sc})`;
-  newBack.style.opacity=String(POS[0].op);
-  newBack.style.zIndex='1';
-  setTimeout(()=>{
-    cur=nextCur;
-    showDeck();
-    busy=false;
-  },DUR+40);
+  const newBackI=(nextCur+2)%total;
+  if(dir===1){
+    // top flies out right
+    ss(cardEls[topI],{rot:-22,tx:-300,sc:.8,op:0,dur:DUR,ease:FAST,z:20});
+    // mid rises to top
+    ss(cardEls[midI],{...POS[2],dur:DUR,ease:SPR,z:10});
+    // back rises to mid
+    ss(cardEls[backI],{...POS[1],dur:DUR,ease:EASE,z:2});
+    // snap new back card behind silently
+    const nb=cardEls[newBackI];
+    nb.style.transition='none';nb.style.opacity=String(POS[0].op);nb.style.zIndex='1';
+    nb.style.transform=`rotate(${POS[0].rot}deg) translate(${POS[0].tx}px,${POS[0].ty}px) scale(${POS[0].sc})`;
+  } else {
+    // top flies out left
+    ss(cardEls[topI],{rot:22,tx:300,sc:.8,op:0,dur:DUR,ease:FAST,z:20});
+    // snap incoming card (prev) to left off-screen, then animate in as new top
+    const prevI=(cur-1+total)%total;
+    cardEls[prevI].style.transition='none';
+    cardEls[prevI].style.transform=`rotate(-10deg) translate(-300px,-10px) scale(.8)`;
+    cardEls[prevI].style.opacity='0';cardEls[prevI].style.zIndex='10';
+    void cardEls[prevI].offsetWidth;
+    ss(cardEls[prevI],{...POS[2],dur:DUR,ease:SPR,z:10});
+    // mid and back drop down
+    ss(cardEls[midI],{...POS[1],dur:DUR,ease:EASE,z:2});
+    ss(cardEls[backI],{...POS[0],dur:DUR,ease:EASE,z:1});
+  }
+  setTimeout(()=>{cur=nextCur;showDeck();busy=false;},DUR+40);
 }
 function jmp(i){
   if(busy||i===cur)return;busy=true;
   const d=i>cur?1:-1;
-  ss(cardEls[cur],{rot:d*-22,tx:d*-280,ty:-10,sc:.8,op:0,dur:DUR,ease:FAST,z:20});
-  setTimeout(()=>{cur=i;showDeck();busy=false},DUR+30);
+  ss(cardEls[cur],{rot:d*-22,tx:d*-300,sc:.8,op:0,dur:DUR,ease:FAST,z:20});
+  setTimeout(()=>{cur=i;showDeck();busy=false;},DUR+30);
 }
 document.getElementById('nb').onclick=()=>go(1);document.getElementById('pb').onclick=()=>go(-1);
 document.addEventListener('keydown',e=>{if(e.key==='ArrowRight')go(1);if(e.key==='ArrowLeft')go(-1)});
