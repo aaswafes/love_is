@@ -482,9 +482,22 @@ function bld(){
   rvT.push(setTimeout(()=>{top.classList.add('rv');rvT.push(setTimeout(()=>rv.classList.add('g'),950))},100));
 }
 bld();
-const SPR='cubic-bezier(0.34,1.56,0.64,1)',EASE='cubic-bezier(0.25,1,0.5,1)',FAST='cubic-bezier(0.4,0,0.2,1)',DUR=580;
-function ss(el,{rot=0,tx=0,ty=0,sc=1,op=1,dur=DUR,ease=EASE,delay=0,z}){el.style.transition=`transform ${dur}ms ${ease} ${delay}ms,opacity ${dur}ms ease ${delay}ms`;el.style.transform=`rotate(${rot}deg) translate(${tx}px,${ty}px) scale(${sc})`;el.style.opacity=op;if(z!==undefined)el.style.zIndex=z}
-function go(dir){if(busy)return;busy=true;ss(els[2],{rot:dir*-22,tx:dir*-210,ty:-22,sc:.78,op:0,dur:DUR,ease:FAST,z:20});ss(els[1],{...POS[2],dur:DUR,ease:SPR,delay:60,z:10});ss(els[0],{...POS[1],dur:DUR,ease:EASE,delay:110,z:2});setTimeout(()=>{cur=((cur+dir)%total+total)%total;bld();busy=false},DUR+80)}
+const SPR='cubic-bezier(0.22,1.4,0.36,1)',EASE='cubic-bezier(0.25,1,0.5,1)',FAST='cubic-bezier(0.32,0,0.16,1)',DUR=640;
+function ss(el,{rot=0,tx=0,ty=0,sc=1,op=1,dur=DUR,ease=EASE,delay=0,z}){
+  el.style.transition=`transform ${dur}ms ${ease} ${delay}ms, opacity ${Math.round(dur*.7)}ms ease ${delay}ms`;
+  el.style.transform=`rotate(${rot}deg) translate(${tx}px,${ty}px) scale(${sc})`;
+  el.style.opacity=op;if(z!==undefined)el.style.zIndex=z;
+}
+function go(dir){
+  if(busy)return;busy=true;
+  // top card: arc up slightly then fly out sideways
+  ss(els[2],{rot:dir*-28,tx:dir*-260,ty:-30,sc:.72,op:0,dur:DUR,ease:FAST,z:20});
+  // second card rises and tilts gently into top position
+  ss(els[1],{...POS[2],dur:DUR,ease:SPR,delay:80,z:10});
+  // third card slides up into second position
+  ss(els[0],{...POS[1],dur:DUR,ease:EASE,delay:150,z:2});
+  setTimeout(()=>{cur=((cur+dir)%total+total)%total;bld();busy=false},DUR+60);
+}
 function jmp(i){if(busy||i===cur)return;busy=true;const d=i>cur?1:-1;ss(els[2],{rot:d*-18,tx:d*-170,ty:-16,sc:.82,op:0,dur:460,ease:FAST,z:20});setTimeout(()=>{cur=i;bld();busy=false},500)}
 document.getElementById('nb').onclick=()=>go(1);document.getElementById('pb').onclick=()=>go(-1);
 document.addEventListener('keydown',e=>{if(e.key==='ArrowRight')go(1);if(e.key==='ArrowLeft')go(-1)});
@@ -591,7 +604,64 @@ const p6=document.getElementById('p6');if(p6)mo.observe(p6);
 // TIMER
 function pad(n){return String(Math.max(0,n)).padStart(2,'0')}
 function tick(id,val){const el=document.getElementById(id);if(!el)return;const s=pad(val);if(el.textContent!==s){el.classList.remove('tick');void el.offsetWidth;el.classList.add('tick');el.textContent=s;setTimeout(()=>el.classList.remove('tick'),200)}}
-function upT(){const t=new Date('2025-04-12T00:00:00'),now=new Date();let d=Math.max(0,t-now);tick('cd-d',Math.floor(d/86400000));tick('cd-h',Math.floor((d%86400000)/3600000));tick('cd-m',Math.floor((d%3600000)/60000));tick('cd-s',Math.floor((d%60000)/1000));if(d===0){const m=document.querySelector('.tmsg');if(m)m.innerHTML='этот день настал! <span class="ac">с праздником, любимая 💗</span>'}}
+
+// ── Celebration ──
+function launchCelebration(){
+  // overlay
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;z-index:9999;pointer-events:none;overflow:hidden';
+  document.body.appendChild(ov);
+  // big message
+  const msg=document.createElement('div');
+  msg.textContent='Everything for you 💗';
+  msg.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);z-index:10000;font-family:\'Playfair Display\',serif;font-style:italic;font-size:clamp(1.6rem,6vw,3.2rem);background:linear-gradient(135deg,#6d0f33,#e0195a,#ff4f8b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;text-align:center;padding:0 20px;filter:drop-shadow(0 4px 24px rgba(224,25,90,.5));transition:transform .7s cubic-bezier(0.22,1.4,0.36,1)';
+  document.body.appendChild(msg);
+  setTimeout(()=>msg.style.transform='translate(-50%,-50%) scale(1)',80);
+  // burst petals
+  const symbols=['🌸','💗','🌹','✨','💕','🌷','💖','🌺','💝','🫧'];
+  function burst(){
+    for(let i=0;i<22;i++){
+      const p=document.createElement('div');
+      const sym=symbols[Math.floor(Math.random()*symbols.length)];
+      p.textContent=sym;
+      const sx=20+Math.random()*60; // start x %
+      const tx=(Math.random()-0.5)*120; // travel x vw
+      const dur=2.2+Math.random()*1.8;
+      const size=1+Math.random()*1.4;
+      p.style.cssText=`position:absolute;bottom:0;left:${sx}vw;font-size:${size}rem;opacity:0;animation:celebUp ${dur}s cubic-bezier(0.2,0.8,0.4,1) forwards;animation-delay:${Math.random()*1.2}s;--tx:${tx}vw`;
+      ov.appendChild(p);
+    }
+  }
+  // inject keyframes once
+  if(!document.getElementById('celebKF')){
+    const st=document.createElement('style');st.id='celebKF';
+    st.textContent=`
+      @keyframes celebUp{
+        0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:0}
+        10%{opacity:1}
+        80%{opacity:.8}
+        100%{transform:translateY(-105vh) translateX(var(--tx)) rotate(540deg);opacity:0}
+      }`;
+    document.head.appendChild(st);
+  }
+  burst();
+  setTimeout(burst,800);
+  setTimeout(burst,1600);
+  setTimeout(burst,2600);
+  // auto-remove overlay after 8s but keep message
+  setTimeout(()=>ov.remove(),8000);
+}
+
+let celebrated=false;
+function upT(){
+  const t=new Date('2026-04-12T00:00:00'),now=new Date();
+  let d=Math.max(0,t-now);
+  tick('cd-d',Math.floor(d/86400000));
+  tick('cd-h',Math.floor((d%86400000)/3600000));
+  tick('cd-m',Math.floor((d%3600000)/60000));
+  tick('cd-s',Math.floor((d%60000)/1000));
+  if(d===0&&!celebrated){celebrated=true;launchCelebration();}
+}
 upT();setInterval(upT,1000);
 </script>
 </body>
