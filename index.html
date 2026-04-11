@@ -461,95 +461,61 @@ const petEl=document.getElementById('petals');
   }
 });
 
-// CARDS
+// CARDS — 3 fixed DOM slots, content swaps in
 const total=CD.length;let cur=0,busy=false;
 const deckEl=document.getElementById('deck'),cntEl=document.getElementById('cnt'),pdEl=document.getElementById('pdots');
 for(let i=0;i<total;i++){const d=document.createElement('div');d.className='pd'+(i===0?' on':'');d.onclick=()=>jmp(i);pdEl.appendChild(d)}
 function sd(){pdEl.querySelectorAll('.pd').forEach((d,i)=>d.classList.toggle('on',i===cur))}
-const POS=[{z:1,rot:-4.5,tx:0,ty:13,sc:.89,op:.3},{z:2,rot:2.5,tx:0,ty:6,sc:.955,op:.58},{z:10,rot:0,tx:0,ty:0,sc:1,op:1}];
-const DUR=320,SPR='cubic-bezier(0.22,1.3,0.36,1)',EASE='cubic-bezier(0.25,1,0.5,1)',FAST='cubic-bezier(0.4,0,1,1)';
-// Pre-build ALL cards once, hide off-screen
-let cardEls=[];
-function applyPos(el,p,animate){
-  if(!animate)el.style.transition='none';
-  else el.style.transition=`transform ${DUR}ms ${EASE}, opacity ${DUR}ms ease`;
-  el.style.transform=`rotate(${p.rot}deg) translate(${p.tx}px,${p.ty}px) scale(${p.sc})`;
-  el.style.opacity=p.op;
-  el.style.zIndex=p.z;
+const DUR=300;
+// 3 slots: slot[0]=back, slot[1]=mid, slot[2]=top
+const slots=[];
+for(let s=0;s<3;s++){
+  const el=document.createElement('div');el.className='card';
+  el.style.cssText='position:absolute;inset:0;border-radius:20px;overflow:hidden;will-change:transform,opacity;transform-origin:center bottom;background:#fff;box-shadow:0 12px 50px rgba(224,25,90,.22),0 3px 12px rgba(0,0,0,.08);transition:none';
+  deckEl.appendChild(el);slots.push(el);
 }
-function initDeck(){
-  deckEl.innerHTML='';cardEls=[];
-  for(let i=0;i<total;i++){
-    const d=CD[i],el=document.createElement('div');el.className='card';
-    el.innerHTML=`<div class="cr"></div><img src="data:image/jpeg;base64,${d.b64}" alt="" loading="lazy" draggable="false"><div class="badge">${d.emoji}</div><div class="cap"><div class="cnum">${String(i+1).padStart(2,'0')}/${total}</div><div class="ctxt">${d.cap}</div></div>`;
-    // hide all cards initially below deck
-    el.style.cssText='position:absolute;inset:0;border-radius:20px;overflow:hidden;cursor:pointer;user-select:none;will-change:transform,opacity;transform-origin:center bottom;background:#fff;box-shadow:0 12px 50px rgba(224,25,90,.22),0 3px 12px rgba(0,0,0,.08);opacity:0;transform:translateY(60px) scale(.9);transition:none;z-index:0';
-    deckEl.appendChild(el);cardEls.push(el);
-  }
+function cardHTML(idx){
+  const d=CD[idx];
+  return `<img src="data:image/jpeg;base64,${d.b64}" alt="" draggable="false" style="width:100%;height:280px;object-fit:cover;object-position:center top;display:block;filter:saturate(1) brightness(1)"><div class="badge">${d.emoji}</div><div class="cap"><div class="cnum">${String(idx+1).padStart(2,'0')}/${total}</div><div class="ctxt">${d.cap}</div></div>`;
 }
-let rvT=[];
-function showDeck(){
-  rvT.forEach(clearTimeout);rvT=[];
-  // position top 3 cards
-  const idxs=[(cur+2)%total,(cur+1)%total,cur];
-  cardEls.forEach((el,i)=>{
-    const slot=idxs.indexOf(i);
-    if(slot===-1){el.style.opacity='0';el.style.zIndex='0';el.style.transform='translateY(60px) scale(.9)';return;}
-    applyPos(el,POS[slot],false);
-  });
+const ROTS=[[-4.5,13,.89,.3,1],[2.5,6,.955,.58,2],[0,0,1,1,10]];
+function applySlot(el,r,tx,anim){
+  if(!anim)el.style.transition='none'; else el.style.transition=`transform ${DUR}ms cubic-bezier(0.25,1,0.5,1), opacity ${DUR}ms ease`;
+  el.style.transform=`rotate(${r[0]}deg) translate(${tx||0}px,${r[1]}px) scale(${r[2]})`;
+  el.style.opacity=r[3];el.style.zIndex=r[4];
+}
+function paint(){
+  slots[0].innerHTML=cardHTML((cur+2)%total);
+  slots[1].innerHTML=cardHTML((cur+1)%total);
+  slots[2].innerHTML=cardHTML(cur);
+  applySlot(slots[0],ROTS[0],0,false);
+  applySlot(slots[1],ROTS[1],0,false);
+  applySlot(slots[2],ROTS[2],0,false);
   cntEl.textContent=`${cur+1}/${total}`;sd();
-  const top=cardEls[cur],rv=top.querySelector('.cr');
-  rv.classList.remove('g');top.classList.remove('rv');
-  rvT.push(setTimeout(()=>{top.classList.add('rv');rvT.push(setTimeout(()=>rv.classList.add('g'),900))},80));
 }
-initDeck();showDeck();
-
-function ss(el,{rot=0,tx=0,ty=0,sc=1,op=1,dur=DUR,ease=EASE,z}){
-  el.style.transition=`transform ${dur}ms ${ease}, opacity ${Math.round(dur*.8)}ms ease`;
-  el.style.transform=`rotate(${rot}deg) translate(${tx}px,${ty}px) scale(${sc})`;
-  el.style.opacity=op;
-  if(z!==undefined)el.style.zIndex=z;
-}
-// current stack: top=cardEls[cur], mid=cardEls[(cur+1)%total], back=cardEls[(cur+2)%total]
+paint();
 function go(dir){
   if(busy)return;busy=true;
-  const topI=cur;
-  const midI=(cur+1)%total;
-  const backI=(cur+2)%total;
-  const nextCur=((cur+dir)%total+total)%total;
-  const newBackI=(nextCur+2)%total;
-  if(dir===1){
-    // top flies out right
-    ss(cardEls[topI],{rot:-22,tx:-300,sc:.8,op:0,dur:DUR,ease:FAST,z:20});
-    // mid rises to top
-    ss(cardEls[midI],{...POS[2],dur:DUR,ease:SPR,z:10});
-    // back rises to mid
-    ss(cardEls[backI],{...POS[1],dur:DUR,ease:EASE,z:2});
-    // snap new back card behind silently
-    const nb=cardEls[newBackI];
-    nb.style.transition='none';nb.style.opacity=String(POS[0].op);nb.style.zIndex='1';
-    nb.style.transform=`rotate(${POS[0].rot}deg) translate(${POS[0].tx}px,${POS[0].ty}px) scale(${POS[0].sc})`;
-  } else {
-    // top flies out left
-    ss(cardEls[topI],{rot:22,tx:300,sc:.8,op:0,dur:DUR,ease:FAST,z:20});
-    // snap incoming card (prev) to left off-screen, then animate in as new top
-    const prevI=(cur-1+total)%total;
-    cardEls[prevI].style.transition='none';
-    cardEls[prevI].style.transform=`rotate(-10deg) translate(-300px,-10px) scale(.8)`;
-    cardEls[prevI].style.opacity='0';cardEls[prevI].style.zIndex='10';
-    void cardEls[prevI].offsetWidth;
-    ss(cardEls[prevI],{...POS[2],dur:DUR,ease:SPR,z:10});
-    // mid and back drop down
-    ss(cardEls[midI],{...POS[1],dur:DUR,ease:EASE,z:2});
-    ss(cardEls[backI],{...POS[0],dur:DUR,ease:EASE,z:1});
-  }
-  setTimeout(()=>{cur=nextCur;showDeck();busy=false;},DUR+40);
+  // animate top card out
+  slots[2].style.transition=`transform ${DUR}ms cubic-bezier(0.4,0,1,1), opacity ${Math.round(DUR*.6)}ms ease`;
+  slots[2].style.transform=`rotate(${dir*-20}deg) translate(${dir*-320}px,-10px) scale(.78)`;
+  slots[2].style.opacity='0';
+  // animate mid up to top
+  applySlot(slots[1],ROTS[2],0,true);
+  // animate back up to mid
+  applySlot(slots[0],ROTS[1],0,true);
+  setTimeout(()=>{
+    cur=((cur+dir)%total+total)%total;
+    paint();busy=false;
+  },DUR+20);
 }
 function jmp(i){
   if(busy||i===cur)return;busy=true;
   const d=i>cur?1:-1;
-  ss(cardEls[cur],{rot:d*-22,tx:d*-300,sc:.8,op:0,dur:DUR,ease:FAST,z:20});
-  setTimeout(()=>{cur=i;showDeck();busy=false;},DUR+30);
+  slots[2].style.transition=`transform ${DUR}ms cubic-bezier(0.4,0,1,1), opacity ${Math.round(DUR*.6)}ms ease`;
+  slots[2].style.transform=`rotate(${d*-20}deg) translate(${d*-320}px,-10px) scale(.78)`;
+  slots[2].style.opacity='0';
+  setTimeout(()=>{cur=i;paint();busy=false;},DUR+20);
 }
 document.getElementById('nb').onclick=()=>go(1);document.getElementById('pb').onclick=()=>go(-1);
 document.addEventListener('keydown',e=>{if(e.key==='ArrowRight')go(1);if(e.key==='ArrowLeft')go(-1)});
